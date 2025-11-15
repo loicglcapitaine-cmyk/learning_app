@@ -18,26 +18,31 @@ class ProgrammeDAO:
     
     def __init__(self, db: DatabaseSchema):
         self.db = db
-        self.cursor = db.conn.cursor()
+    
+    def _get_cursor(self):
+        """Obtient un cursor frais pour éviter les problèmes de connexion"""
+        return self.db.conn.cursor()
     
     def get_programme(self, prog_id: str) -> Optional[Dict]:
         """Récupère un programme par ID"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM programmes WHERE id = ? AND actif = 1
         """, (prog_id,))
         
-        row = self.cursor.fetchone()
+        row = cursor.fetchone()
         if row:
             return dict(row)
         return None
     
     def get_all_programmes(self) -> List[Dict]:
         """Récupère tous les programmes actifs"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM programmes WHERE actif = 1 ORDER BY date_creation DESC
         """)
         
-        return [dict(row) for row in self.cursor.fetchall()]
+        return [dict(row) for row in cursor.fetchall()]
     
     def get_programme_with_stats(self, prog_id: str) -> Dict:
         """Récupère un programme avec ses statistiques"""
@@ -45,8 +50,9 @@ class ProgrammeDAO:
         if not prog:
             return None
         
+        cursor = self._get_cursor()
         # Compter semaines, jours, contenus
-        self.cursor.execute("""
+        cursor.execute("""
             SELECT COUNT(DISTINCT s.id) as nb_semaines,
                    COUNT(DISTINCT j.id) as nb_jours,
                    COUNT(c.id) as nb_contenus
@@ -56,7 +62,7 @@ class ProgrammeDAO:
             WHERE s.programme_id = ?
         """, (prog_id,))
         
-        stats = dict(self.cursor.fetchone())
+        stats = dict(cursor.fetchone())
         prog.update(stats)
         
         return prog
@@ -67,25 +73,30 @@ class SemaineDAO:
     
     def __init__(self, db: DatabaseSchema):
         self.db = db
-        self.cursor = db.conn.cursor()
+    
+    def _get_cursor(self):
+        """Obtient un cursor frais"""
+        return self.db.conn.cursor()
     
     def get_semaines(self, prog_id: str) -> List[Dict]:
         """Récupère toutes les semaines d'un programme"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM semaines 
             WHERE programme_id = ? 
             ORDER BY ordre, numero
         """, (prog_id,))
         
-        return [dict(row) for row in self.cursor.fetchall()]
+        return [dict(row) for row in cursor.fetchall()]
     
     def get_semaine(self, sem_id: str) -> Optional[Dict]:
         """Récupère une semaine par ID"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM semaines WHERE id = ?
         """, (sem_id,))
         
-        row = self.cursor.fetchone()
+        row = cursor.fetchone()
         if row:
             return dict(row)
         return None
@@ -96,25 +107,30 @@ class JourDAO:
     
     def __init__(self, db: DatabaseSchema):
         self.db = db
-        self.cursor = db.conn.cursor()
+    
+    def _get_cursor(self):
+        """Obtient un cursor frais"""
+        return self.db.conn.cursor()
     
     def get_jours(self, sem_id: str) -> List[Dict]:
         """Récupère tous les jours d'une semaine"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM jours 
             WHERE semaine_id = ? 
             ORDER BY ordre, nom
         """, (sem_id,))
         
-        return [dict(row) for row in self.cursor.fetchall()]
+        return [dict(row) for row in cursor.fetchall()]
     
     def get_jour(self, jour_id: str) -> Optional[Dict]:
         """Récupère un jour par ID"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM jours WHERE id = ?
         """, (jour_id,))
         
-        row = self.cursor.fetchone()
+        row = cursor.fetchone()
         if row:
             return dict(row)
         return None
@@ -125,50 +141,57 @@ class ContenuDAO:
     
     def __init__(self, db: DatabaseSchema):
         self.db = db
-        self.cursor = db.conn.cursor()
+    
+    def _get_cursor(self):
+        """Obtient un cursor frais"""
+        return self.db.conn.cursor()
     
     def get_contenus(self, jour_id: str) -> List[Dict]:
         """Récupère tous les contenus d'un jour"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM contenus 
             WHERE jour_id = ? 
             ORDER BY ordre
         """, (jour_id,))
         
-        return [dict(row) for row in self.cursor.fetchall()]
+        return [dict(row) for row in cursor.fetchall()]
     
     def get_contenu(self, contenu_id: str) -> Optional[Dict]:
         """Récupère un contenu par ID"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM contenus WHERE id = ?
         """, (contenu_id,))
         
-        row = self.cursor.fetchone()
+        row = cursor.fetchone()
         if row:
             return dict(row)
         return None
     
     def get_prerequis(self, contenu_id: str) -> List[Dict]:
         """Récupère les prérequis d'un contenu"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT c.*, p.obligatoire
             FROM prerequis p
             JOIN contenus c ON c.id = p.prerequis_contenu_id
             WHERE p.contenu_id = ?
         """, (contenu_id,))
         
-        return [dict(row) for row in self.cursor.fetchall()]
+        return [dict(row) for row in cursor.fetchall()]
     
     def get_contenus_dependants(self, contenu_id: str) -> List[Dict]:
         """Récupère les contenus qui dépendent de celui-ci"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT c.*, p.obligatoire
             FROM prerequis p
             JOIN contenus c ON c.id = p.contenu_id
             WHERE p.prerequis_contenu_id = ?
         """, (contenu_id,))
         
-        return [dict(row) for row in self.cursor.fetchall()]
+        return [dict(row) for row in cursor.fetchall()]
 
 
 class ProgressionDAO:
@@ -176,22 +199,27 @@ class ProgressionDAO:
     
     def __init__(self, db: DatabaseSchema):
         self.db = db
-        self.cursor = db.conn.cursor()
+    
+    def _get_cursor(self):
+        """Obtient un cursor frais"""
+        return self.db.conn.cursor()
     
     def get_progression(self, contenu_id: str) -> Optional[Dict]:
         """Récupère la progression d'un contenu"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT * FROM progression WHERE contenu_id = ?
         """, (contenu_id,))
         
-        row = self.cursor.fetchone()
+        row = cursor.fetchone()
         if row:
             return dict(row)
         return None
     
     def marquer_commence(self, contenu_id: str):
         """Marque un contenu comme commencé"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             INSERT OR REPLACE INTO progression 
             (contenu_id, statut, date_debut)
             VALUES (?, 'en_cours', ?)
@@ -204,8 +232,9 @@ class ProgressionDAO:
         # Récupérer la progression existante pour garder date_debut
         prog_existante = self.get_progression(contenu_id)
         
+        cursor = self._get_cursor()
         if prog_existante:
-            self.cursor.execute("""
+            cursor.execute("""
                 UPDATE progression 
                 SET statut = 'termine', 
                     date_completion = ?,
@@ -214,7 +243,7 @@ class ProgressionDAO:
                 WHERE contenu_id = ?
             """, (datetime.now(), temps_passe, notes, contenu_id))
         else:
-            self.cursor.execute("""
+            cursor.execute("""
                 INSERT INTO progression 
                 (contenu_id, statut, date_debut, date_completion, temps_passe, notes)
                 VALUES (?, 'termine', ?, ?, ?, ?)
@@ -224,7 +253,8 @@ class ProgressionDAO:
     
     def get_progression_programme(self, prog_id: str) -> Dict:
         """Récupère les statistiques de progression d'un programme"""
-        self.cursor.execute("""
+        cursor = self._get_cursor()
+        cursor.execute("""
             SELECT 
                 COUNT(DISTINCT c.id) as total_contenus,
                 COUNT(DISTINCT CASE WHEN p.statut = 'termine' THEN c.id END) as contenus_termines,
@@ -238,7 +268,7 @@ class ProgressionDAO:
             WHERE s.programme_id = ?
         """, (prog_id,))
         
-        return dict(self.cursor.fetchone())
+        return dict(cursor.fetchone())
 
 
 # ============================================================================
