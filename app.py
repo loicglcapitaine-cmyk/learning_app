@@ -28,7 +28,7 @@ st.set_page_config(
 if 'db_lock' not in st.session_state:
     st.session_state.db_lock = threading.Lock()
 
-@st.cache_resource
+
 def init_database():
     """Initialise la connexion à la base de données"""
     db_path = "learning_programme.db"
