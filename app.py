@@ -390,41 +390,46 @@ elif page == "📊 Ma progression":
     st.subheader("📚 Progression par semaine")
     
     cursor = db.conn.cursor()
-    cursor.execute("""
-        SELECT 
-            s.numero,
-            s.titre,
-            COUNT(c.id) as total,
-            COUNT(CASE WHEN p.statut = 'termine' THEN 1 END) as termines,
-            SUM(c.temps_estime) as temps_estime,
-            SUM(CASE WHEN p.statut = 'termine' THEN p.temps_passe ELSE 0 END) as temps_passe
-        FROM semaines s
-        JOIN jours j ON j.semaine_id = s.id
-        JOIN contenus c ON c.jour_id = j.id
-        LEFT JOIN progression p ON p.contenu_id = c.id
-        WHERE s.programme_id = ?
-        GROUP BY s.id
-        ORDER BY s.ordre
-    """, (PROG_ID,))
-    
-    for row in cursor.fetchall():
-        row = dict(row)
-        pct = (row['termines'] / row['total'] * 100) if row['total'] > 0 else 0
+    try:
+        cursor.execute("""
+            SELECT 
+                s.numero,
+                s.titre,
+                COUNT(c.id) as total,
+                COUNT(CASE WHEN p.statut = 'termine' THEN 1 END) as termines,
+                SUM(c.temps_estime) as temps_estime,
+                SUM(CASE WHEN p.statut = 'termine' THEN p.temps_passe ELSE 0 END) as temps_passe
+            FROM semaines s
+            JOIN jours j ON j.semaine_id = s.id
+            JOIN contenus c ON c.jour_id = j.id
+            LEFT JOIN progression p ON p.contenu_id = c.id
+            WHERE s.programme_id = ?
+            GROUP BY s.id
+            ORDER BY s.ordre
+        """, (PROG_ID,))
         
-        with st.container():
-            col1, col2, col3 = st.columns([4, 1, 1])
-            
-            with col1:
-                st.write(f"**Semaine {row['numero']}**: {row['titre']}")
-                st.progress(pct / 100)
-            
-            with col2:
-                st.metric("Contenus", f"{row['termines']}/{row['total']}")
-            
-            with col3:
-                st.metric("Temps", format_duration(row['temps_passe'] or 0))
+        resultats = cursor.fetchall()
         
-        st.markdown("")
+        for row in resultats:
+            row = dict(row)
+            pct = (row['termines'] / row['total'] * 100) if row['total'] > 0 else 0
+            
+            with st.container():
+                col1, col2, col3 = st.columns([4, 1, 1])
+                
+                with col1:
+                    st.write(f"**Semaine {row['numero']}**: {row['titre']}")
+                    st.progress(pct / 100)
+                
+                with col2:
+                    st.metric("Contenus", f"{row['termines']}/{row['total']}")
+                
+                with col3:
+                    st.metric("Temps", format_duration(row['temps_passe'] or 0))
+            
+            st.markdown("")
+    finally:
+        cursor.close()
     
     st.markdown("---")
     
@@ -481,26 +486,29 @@ elif page == "🔍 Recherche":
     if terme:
         cursor = db.conn.cursor()
         
-        # Construction de la requête selon le filtre
-        type_condition = ""
-        if filtre_type != "Tous":
-            type_map = {
-                "Théorie": "theorie",
-                "Exercice": "exercice",
-                "Projet": "projet",
-                "Ressource": "ressource"
-            }
-            type_condition = f" AND type = '{type_map[filtre_type]}'"
-        
-        cursor.execute(f"""
-            SELECT * FROM contenus
-            WHERE (titre LIKE ? OR description LIKE ?)
-            {type_condition}
-            ORDER BY ordre
-            LIMIT 20
-        """, (f"%{terme}%", f"%{terme}%"))
-        
-        resultats = [dict(row) for row in cursor.fetchall()]
+        try:
+            # Construction de la requête selon le filtre
+            type_condition = ""
+            if filtre_type != "Tous":
+                type_map = {
+                    "Théorie": "theorie",
+                    "Exercice": "exercice",
+                    "Projet": "projet",
+                    "Ressource": "ressource"
+                }
+                type_condition = f" AND type = '{type_map[filtre_type]}'"
+            
+            cursor.execute(f"""
+                SELECT * FROM contenus
+                WHERE (titre LIKE ? OR description LIKE ?)
+                {type_condition}
+                ORDER BY ordre
+                LIMIT 20
+            """, (f"%{terme}%", f"%{terme}%"))
+            
+            resultats = [dict(row) for row in cursor.fetchall()]
+        finally:
+            cursor.close()
         
         if resultats:
             st.success(f"✅ {len(resultats)} résultat(s) trouvé(s)")

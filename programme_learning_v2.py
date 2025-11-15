@@ -565,7 +565,7 @@ class ProgrammeService:
     
     def suggerer_prochain_contenu(self, prog_id: str) -> Optional[Dict]:
         """Suggère le prochain contenu à étudier"""
-        cursor = self.db.conn.cursor()
+        cursor = self.db.conn.cursor()  # ✅ Créer un nouveau cursor
         
         # Trouver les contenus non commencés avec prérequis validés
         cursor.execute("""
@@ -581,6 +581,7 @@ class ProgrammeService:
         """, (prog_id,))
         
         candidats = [dict(row) for row in cursor.fetchall()]
+        cursor.close()  # ✅ Fermer le cursor
         
         # Trouver le premier avec tous les prérequis validés
         for contenu in candidats:
