@@ -7,6 +7,7 @@ import streamlit as st
 from database_schema import DatabaseSchema, format_duration
 from programme_learning_v2 import ProgrammeService, ProgressionService
 import os
+import threading
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE
@@ -20,8 +21,12 @@ st.set_page_config(
 )
 
 # ============================================================================
-# INITIALISATION
+# INITIALISATION AVEC VERROU THREAD-SAFE
 # ============================================================================
+
+# Créer un verrou global pour SQLite
+if 'db_lock' not in st.session_state:
+    st.session_state.db_lock = threading.Lock()
 
 @st.cache_resource
 def init_database():
@@ -42,6 +47,12 @@ def init_database():
     db = DatabaseSchema(db_path)
     db.connect()
     return db
+
+# Wrapper sécurisé pour les requêtes
+def safe_query(query_func):
+    """Exécute une requête avec le verrou"""
+    with st.session_state.db_lock:
+        return query_func()
 
 # Initialiser les services avec session_state pour éviter les problèmes de connexion
 if 'db' not in st.session_state:
@@ -560,17 +571,21 @@ elif page == "✅ Valider un contenu":
     
     if terme:
         cursor = db.conn.cursor()
-        cursor.execute("""
-            SELECT c.*
-            FROM contenus c
-            LEFT JOIN progression p ON p.contenu_id = c.id
-            WHERE (c.titre LIKE ? OR c.description LIKE ?)
-              AND (p.statut IS NULL OR p.statut != 'termine')
-            ORDER BY c.ordre
-            LIMIT 10
-        """, (f"%{terme}%", f"%{terme}%"))
         
-        resultats = [dict(row) for row in cursor.fetchall()]
+        try:
+            cursor.execute("""
+                SELECT c.*
+                FROM contenus c
+                LEFT JOIN progression p ON p.contenu_id = c.id
+                WHERE (c.titre LIKE ? OR c.description LIKE ?)
+                  AND (p.statut IS NULL OR p.statut != 'termine')
+                ORDER BY c.ordre
+                LIMIT 10
+            """, (f"%{terme}%", f"%{terme}%"))
+            
+            resultats = [dict(row) for row in cursor.fetchall()]
+        finally:
+            cursor.close()
         
         if resultats:
             contenu_selectionne = st.selectbox(
