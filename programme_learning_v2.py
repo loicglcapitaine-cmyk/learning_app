@@ -27,6 +27,7 @@ class ProgrammeDAO:
             return cursor.fetchall()
         finally:
             cursor.close()
+
     
     def _execute_one(self, query, params=()):
         """Exécute une requête et retourne un seul résultat"""

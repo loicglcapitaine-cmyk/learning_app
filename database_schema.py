@@ -25,16 +25,26 @@ class DatabaseSchema:
         self.conn = None
     
     def connect(self):
-        """Établit la connexion à la base de données"""
-        # check_same_thread=False pour Streamlit (multi-thread)
+        # AJOUTEZ check_same_thread=False
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row  # Permet d'accéder aux colonnes par nom
-        # Active les clés étrangères (désactivées par défaut dans SQLite)
+        self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
-        # Optimisations pour Streamlit
-        self.conn.execute("PRAGMA journal_mode = WAL")  # Write-Ahead Logging
+        # AJOUTEZ ces optimisations
+        self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.execute("PRAGMA synchronous = NORMAL")
         return self.conn
+
+    #def connect(self):
+    #    """Établit la connexion à la base de données"""
+        # check_same_thread=False pour Streamlit (multi-thread)
+    #    self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+    #    self.conn.row_factory = sqlite3.Row  # Permet d'accéder aux colonnes par nom
+        # Active les clés étrangères (désactivées par défaut dans SQLite)
+    #    self.conn.execute("PRAGMA foreign_keys = ON")
+        # Optimisations pour Streamlit
+    #    self.conn.execute("PRAGMA journal_mode = WAL")  # Write-Ahead Logging
+    #    self.conn.execute("PRAGMA synchronous = NORMAL")
+    #    return self.conn
     
     def disconnect(self):
         """Ferme la connexion à la base de données"""
