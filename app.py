@@ -43,15 +43,10 @@ def init_database():
     db.connect()
     return db
 
-# Initialiser les services avec session_state pour éviter les problèmes de connexion
-if 'db' not in st.session_state:
-    st.session_state.db = init_database()
-    st.session_state.programme_service = ProgrammeService(st.session_state.db)
-    st.session_state.progression_service = ProgressionService(st.session_state.db)
-
-db = st.session_state.db
-programme_service = st.session_state.programme_service
-progression_service = st.session_state.progression_service
+# Initialiser les services
+db = init_database()
+programme_service = ProgrammeService(db)
+progression_service = ProgressionService(db)
 
 # ID du programme (à adapter si plusieurs programmes)
 PROG_ID = "prog_python_30j"
