@@ -19,30 +19,41 @@ class ProgrammeDAO:
     def __init__(self, db: DatabaseSchema):
         self.db = db
     
-    def _get_cursor(self):
-        """Obtient un cursor frais pour éviter les problèmes de connexion"""
-        return self.db.conn.cursor()
+    def _execute_query(self, query, params=()):
+        """Exécute une requête de manière thread-safe"""
+        cursor = self.db.conn.cursor()
+        try:
+            cursor.execute(query, params)
+            return cursor.fetchall()
+        finally:
+            cursor.close()
+    
+    def _execute_one(self, query, params=()):
+        """Exécute une requête et retourne un seul résultat"""
+        cursor = self.db.conn.cursor()
+        try:
+            cursor.execute(query, params)
+            return cursor.fetchone()
+        finally:
+            cursor.close()
     
     def get_programme(self, prog_id: str) -> Optional[Dict]:
         """Récupère un programme par ID"""
-        cursor = self._get_cursor()
-        cursor.execute("""
+        row = self._execute_one("""
             SELECT * FROM programmes WHERE id = ? AND actif = 1
         """, (prog_id,))
         
-        row = cursor.fetchone()
         if row:
             return dict(row)
         return None
     
     def get_all_programmes(self) -> List[Dict]:
         """Récupère tous les programmes actifs"""
-        cursor = self._get_cursor()
-        cursor.execute("""
+        rows = self._execute_query("""
             SELECT * FROM programmes WHERE actif = 1 ORDER BY date_creation DESC
         """)
         
-        return [dict(row) for row in cursor.fetchall()]
+        return [dict(row) for row in rows]
     
     def get_programme_with_stats(self, prog_id: str) -> Dict:
         """Récupère un programme avec ses statistiques"""
@@ -50,9 +61,8 @@ class ProgrammeDAO:
         if not prog:
             return None
         
-        cursor = self._get_cursor()
         # Compter semaines, jours, contenus
-        cursor.execute("""
+        stats_row = self._execute_one("""
             SELECT COUNT(DISTINCT s.id) as nb_semaines,
                    COUNT(DISTINCT j.id) as nb_jours,
                    COUNT(c.id) as nb_contenus
@@ -62,8 +72,9 @@ class ProgrammeDAO:
             WHERE s.programme_id = ?
         """, (prog_id,))
         
-        stats = dict(cursor.fetchone())
-        prog.update(stats)
+        if stats_row:
+            stats = dict(stats_row)
+            prog.update(stats)
         
         return prog
 
