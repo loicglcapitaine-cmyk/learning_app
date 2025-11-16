@@ -583,7 +583,7 @@ elif page == "📊 Ma progression":
                 st.download_button(
                     label="💾 Télécharger le fichier JSON",
                     data=json_data,
-                    file_name=f"progression_{PROG_ID}_{now().strftime('%Y%m%d')}.json",
+                    file_name=f"progression_{PROG_ID}.json",
                     mime="application/json"
                 )
                 st.success(f"✅ Export réussi !")
