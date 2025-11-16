@@ -574,23 +574,23 @@ elif page == "📊 Ma progression":
     col1, col2 = st.columns(2)
     
     with col1:
-    if st.button("📥 Exporter la progression"):
-        try:
-            # Appel de la fonction
-            json_data = exporter_progression(db, PROG_ID)
+        if st.button("📥 Exporter la progression"):
+            try:
+                # Appel de la fonction
+                json_data = exporter_progression(db, PROG_ID)
         
-            # Bouton de téléchargement
-            st.download_button(
-                label="💾 Télécharger le fichier JSON",
-                data=json_data,
-                file_name=f"progression_{PROG_ID}_{datetime.now().strftime('%Y%m%d')}.json",
-                mime="application/json"
-            )
+                # Bouton de téléchargement
+                st.download_button(
+                    label="💾 Télécharger le fichier JSON",
+                    data=json_data,
+                    file_name=f"progression_{PROG_ID}_{datetime.now().strftime('%Y%m%d')}.json",
+                    mime="application/json"
+                )
         
-             st.success("✅ Export réussi !")
+                 st.success("✅ Export réussi !")
         
-        except Exception as e:
-            st.error(f"❌ Erreur: {str(e)}")
+            except Exception as e:
+                st.error(f"❌ Erreur: {str(e)}")
     
     with col2:
         fichier_import = st.file_uploader("📤 Importer une progression", type=['json'])
