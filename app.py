@@ -351,7 +351,7 @@ if page == "🏠 Accueil":
         else:
             st.markdown('<div class="content-card">', unsafe_allow_html=True)
             st.success("🎉 Félicitations ! Vous avez terminé tout le programme !")
-            st.balloons()
+            #st.balloons()
             st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================================
@@ -472,10 +472,6 @@ elif page == "📅 Semaines":
                     temps_total = sum(c['temps_estime'] or 0 for c in contenus)
                     st.caption(f"⏱️ Temps total estimé : {format_duration(temps_total)}")
 
-# Les autres pages restent identiques pour l'instant...
-# (Ma progression, Recherche améliorée, Valider, Importer)
-
-# Je vais créer les pages manquantes dans la prochaine partie
 
 
 # ============================================================================
@@ -779,7 +775,7 @@ elif page == "✅ Valider un contenu":
                         notes
                     )
                     st.success(f"🎉 '{contenu['titre']}' marqué comme terminé!")
-                    st.balloons()
+                    #st.balloons()
                     
                     # Afficher contenus débloqués
                     dependants = programme_service.contenu_dao.get_contenus_dependants(contenu['id'])
