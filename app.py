@@ -351,7 +351,7 @@ if page == "🏠 Accueil":
         else:
             st.markdown('<div class="content-card">', unsafe_allow_html=True)
             st.success("🎉 Félicitations ! Vous avez terminé tout le programme !")
-            #st.balloons()
+            st.balloons()
             st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================================
@@ -472,14 +472,13 @@ elif page == "📅 Semaines":
                     temps_total = sum(c['temps_estime'] or 0 for c in contenus)
                     st.caption(f"⏱️ Temps total estimé : {format_duration(temps_total)}")
 
+# Les autres pages restent identiques pour l'instant...
+# (Ma progression, Recherche améliorée, Valider, Importer)
 
-
-# ============================================================================
-# PAGE : MA PROGRESSION
-# ============================================================================
+# Je vais créer les pages manquantes dans la prochaine partie
 
 elif page == "📊 Ma progression":
-    st.title("📊 Ma progression")
+    st.markdown('<h1 class="gradient-title">📊 Ma progression</h1>', unsafe_allow_html=True)
     
     # Vue d'ensemble
     col1, col2, col3 = st.columns(3)
@@ -568,6 +567,44 @@ elif page == "📊 Ma progression":
     
     st.markdown("---")
     
+    # Export/Import de progression
+    st.subheader("💾 Sauvegarder ma progression")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📥 Exporter ma progression", use_container_width=True):
+            from import_programme import exporter_progression
+            json_data = exporter_progression(db, PROG_ID)
+            
+            st.download_button(
+                label="⬇️ Télécharger progression.json",
+                data=json_data,
+                file_name=f"progression_{PROG_ID}_{datetime.now().strftime('%Y%m%d')}.json",
+                mime="application/json",
+                use_container_width=True
+            )
+            st.success("✅ Progression exportée ! Cliquez pour télécharger")
+    
+    with col2:
+        fichier_import = st.file_uploader("📤 Importer une progression", type=['json'])
+        if fichier_import:
+            if st.button("🔄 Importer", use_container_width=True):
+                from import_programme import importer_progression
+                import json as json_lib
+                
+                try:
+                    data = json_lib.load(fichier_import)
+                    stats_import = importer_progression(db, data)
+                    st.success(f"✅ {stats_import['nb_importes']} progressions importées !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de l'import : {e}")
+    
+    st.info("💡 **Astuce** : Exportez votre progression avant de changer de programme ou de réinitialiser la base de données")
+    
+    st.markdown("---")
+    
     # Conseils personnalisés
     st.subheader("💡 Conseils personnalisés")
     
@@ -605,7 +642,7 @@ elif page == "📊 Ma progression":
 # ============================================================================
 
 elif page == "🔍 Recherche":
-    st.title("🔍 Recherche de contenus")
+    st.markdown('<h1 class="gradient-title">🔍 Recherche</h1>', unsafe_allow_html=True)
     
     col1, col2 = st.columns([3, 1])
     
@@ -615,7 +652,8 @@ elif page == "🔍 Recherche":
     with col2:
         filtre_type = st.selectbox(
             "Type",
-            ["Tous", "Théorie", "Exercice", "Projet", "Ressource"]
+            ["Tous", "Théorie", "Exercice", "Projet", "Ressource"],
+            key="filter_type"
         )
     
     if terme:
@@ -657,24 +695,27 @@ elif page == "🔍 Recherche":
                     with col1:
                         prog = progression_service.prog_dao.get_progression(contenu['id'])
                         
-                        if prog and prog['statut'] == 'termine':
-                            st.success("✅ Terminé")
-                        elif prog and prog['statut'] == 'en_cours':
-                            st.info("🔄 En cours")
+                        if prog:
+                            badge = get_status_badge(prog['statut'])
                         else:
-                            st.warning("⬜ Non commencé")
+                            badge = get_status_badge('non_commence')
+                        
+                        st.markdown(badge, unsafe_allow_html=True)
                         
                         if contenu['description']:
                             st.write(contenu['description'])
                         
                         if contenu['difficulte']:
-                            st.write(f"**Difficulté**: {'⭐' * contenu['difficulte']}")
+                            st.markdown(f'**Difficulté**: <span class="difficulty-stars">{"⭐" * contenu["difficulte"]}</span>', unsafe_allow_html=True)
                         
                         if contenu['temps_estime']:
                             st.write(f"**Temps estimé**: {format_duration(contenu['temps_estime'])}")
                     
                     with col2:
                         if not prog or prog['statut'] != 'termine':
+                            if not prog or prog['statut'] == 'non_commence':
+                                if st.button("▶️ Commencer", key=f"start_{contenu['id']}", use_container_width=True):
+                                    marquer_en_cours(contenu['id'])
                             if st.button("✅ Valider", key=f"val_{contenu['id']}", use_container_width=True):
                                 st.session_state['valider_contenu_id'] = contenu['id']
                                 st.rerun()
@@ -686,23 +727,43 @@ elif page == "🔍 Recherche":
 # ============================================================================
 
 elif page == "✅ Valider un contenu":
-    st.title("✅ Valider un contenu")
+    st.markdown('<h1 class="gradient-title">✅ Valider un contenu</h1>', unsafe_allow_html=True)
     
     st.info("💡 Recherchez un contenu pour le marquer comme terminé")
     
-    # Recherche
-    terme = st.text_input("🔎 Rechercher", "", key="search_validation")
+    # Recherche avec menu déroulant
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        terme = st.text_input("🔎 Rechercher", "", key="search_validation")
+    
+    with col2:
+        filtre_validation = st.selectbox(
+            "Type",
+            ["Tous", "Théorie", "Exercice", "Projet"],
+            key="filter_validation"
+        )
     
     if terme:
         cursor = db.conn.cursor()
         
         try:
-            cursor.execute("""
+            type_condition = ""
+            if filtre_validation != "Tous":
+                type_map = {
+                    "Théorie": "theorie",
+                    "Exercice": "exercice",
+                    "Projet": "projet"
+                }
+                type_condition = f" AND c.type = '{type_map[filtre_validation]}'"
+            
+            cursor.execute(f"""
                 SELECT c.*
                 FROM contenus c
                 LEFT JOIN progression p ON p.contenu_id = c.id
                 WHERE (c.titre LIKE ? OR c.description LIKE ?)
                   AND (p.statut IS NULL OR p.statut != 'termine')
+                {type_condition}
                 ORDER BY c.ordre
                 LIMIT 10
             """, (f"%{terme}%", f"%{terme}%"))
@@ -712,14 +773,17 @@ elif page == "✅ Valider un contenu":
             cursor.close()
         
         if resultats:
-            contenu_selectionne = st.selectbox(
+            # Menu déroulant pour sélectionner
+            options = [f"{'📖' if r['type'] == 'theorie' else '✏️' if r['type'] == 'exercice' else '🎯'} {r['titre']}" for r in resultats]
+            
+            contenu_selectionne_idx = st.selectbox(
                 "Choisissez un contenu à valider",
-                options=range(len(resultats)),
-                format_func=lambda i: f"{'📖' if resultats[i]['type'] == 'theorie' else '✏️' if resultats[i]['type'] == 'exercice' else '🎯'} {resultats[i]['titre']}",
+                options=range(len(options)),
+                format_func=lambda i: options[i],
                 key="select_contenu_validation"
             )
             
-            contenu = resultats[contenu_selectionne]
+            contenu = resultats[contenu_selectionne_idx]
             
             st.markdown("---")
             st.markdown(f"### {contenu['titre']}")
@@ -731,7 +795,7 @@ elif page == "✅ Valider un contenu":
                     st.write(contenu['description'])
                 
                 if contenu['difficulte']:
-                    st.write(f"**Difficulté**: {'⭐' * contenu['difficulte']}")
+                    st.markdown(f'**Difficulté**: <span class="difficulty-stars">{"⭐" * contenu["difficulte"]}</span>', unsafe_allow_html=True)
             
             with col2:
                 if contenu['temps_estime']:
@@ -775,7 +839,6 @@ elif page == "✅ Valider un contenu":
                         notes
                     )
                     st.success(f"🎉 '{contenu['titre']}' marqué comme terminé!")
-                    #st.balloons()
                     
                     # Afficher contenus débloqués
                     dependants = programme_service.contenu_dao.get_contenus_dependants(contenu['id'])
@@ -787,10 +850,154 @@ elif page == "✅ Valider un contenu":
         else:
             st.warning("Aucun contenu non terminé trouvé pour cette recherche")
 
+# ============================================================================
+# PAGE : IMPORTER UN PROGRAMME
+# ============================================================================
 
-# ============================================================================
-# FOOTER
-# ============================================================================
+elif page == "📥 Importer un programme":
+    st.markdown('<h1 class="gradient-title">📥 Importer un nouveau programme</h1>', unsafe_allow_html=True)
+    
+    st.write("""
+    Importez facilement un nouveau programme d'apprentissage depuis un fichier CSV.
+    Le format CSV permet de créer des programmes dans Excel, Google Sheets ou tout éditeur de texte.
+    """)
+    
+    # Onglets
+    tab1, tab2, tab3 = st.tabs(["📤 Importer", "📋 Template", "📖 Documentation"])
+    
+    with tab1:
+        st.subheader("Importer un programme CSV")
+        
+        fichier_csv = st.file_uploader(
+            "Choisissez un fichier CSV",
+            type=['csv'],
+            help="Format: Type,Semaine,Jour,Titre,Description,Enonce,Indice,Difficulte,TempsEstime"
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            nom_programme = st.text_input(
+                "Nom du programme",
+                placeholder="Ex: JavaScript 30 jours",
+                help="Nom qui apparaîtra dans l'application"
+            )
+        
+        with col2:
+            sujet_programme = st.text_input(
+                "Sujet",
+                placeholder="Ex: JavaScript",
+                help="Catégorie du programme"
+            )
+        
+        if fichier_csv and nom_programme and sujet_programme:
+            if st.button("🚀 Importer le programme", type="primary", use_container_width=True):
+                from import_programme import ProgrammeImporter
+                import io
+                
+                try:
+                    # Lire le CSV
+                    content = fichier_csv.getvalue().decode('utf-8')
+                    csv_file = io.StringIO(content)
+                    
+                    # Importer
+                    importer = ProgrammeImporter(db)
+                    stats = importer.importer_depuis_csv(csv_file, nom_programme, sujet_programme)
+                    
+                    if stats['succes']:
+                        st.success(f"""
+                        ✅ **Import réussi !**
+                        
+                        - Programme ID: `{stats['programme_id']}`
+                        - {stats['nb_semaines']} semaines créées
+                        - {stats['nb_jours']} jours créés
+                        - {stats['nb_contenus']} contenus créés
+                        """)
+                        
+                        if stats['erreurs']:
+                            with st.expander("⚠️ Avertissements", expanded=False):
+                                for err in stats['erreurs']:
+                                    st.warning(err)
+                        
+                        st.info("💡 Redémarrez l'application pour voir le nouveau programme")
+                    else:
+                        st.error("❌ Échec de l'import")
+                        for err in stats['erreurs']:
+                            st.error(err)
+                
+                except Exception as e:
+                    st.error(f"❌ Erreur: {str(e)}")
+    
+    with tab2:
+        st.subheader("Télécharger un template")
+        
+        st.write("""
+        Téléchargez un template CSV pour créer votre propre programme.
+        Deux options disponibles :
+        """)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### 📄 Template vide")
+            if st.button("⬇️ Télécharger template vide", use_container_width=True):
+                from import_programme import ProgrammeImporter
+                importer = ProgrammeImporter(db)
+                template = importer.generer_template_csv()
+                
+                st.download_button(
+                    label="💾 Télécharger",
+                    data=template,
+                    file_name="template_programme.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+        
+        with col2:
+            st.markdown("### 📚 Programme Python complet")
+            st.info("Template avec la semaine 1 complète du programme Python")
+            # Vous pouvez ajouter le téléchargement du CSV Python complet ici
+    
+    with tab3:
+        st.subheader("📖 Format du fichier CSV")
+        
+        st.markdown("""
+        ### Structure du CSV
+        
+        Le fichier CSV doit contenir ces colonnes (dans cet ordre) :
+        
+        | Colonne | Description | Obligatoire | Exemple |
+        |---------|-------------|-------------|---------|
+        | **Type** | Type de ligne | ✅ | `semaine`, `jour`, `theorie`, `exercice`, `projet` |
+        | **Semaine** | Numéro de semaine | ✅ | `1`, `2`, `3`... |
+        | **Jour** | Numéro du jour | Pour contenus | `1`, `2`, `3`, `99` (weekend) |
+        | **Titre** | Titre du contenu | ✅ | `Variables et types` |
+        | **Description** | Description courte | ❌ | `Introduction aux variables` |
+        | **Enonce** | Énoncé détaillé | Pour exercices | `**Objectif**: Créer...` |
+        | **Indice** | Aide pour l'exercice | ❌ | `Utilisez print()` |
+        | **Difficulte** | Niveau 1-5 | ❌ | `2` |
+        | **TempsEstime** | En minutes | ❌ | `30` |
+        
+        ### Exemple complet
+        
+        ```csv
+Type,Semaine,Jour,Titre,Description,Enonce,Indice,Difficulte,TempsEstime
+semaine,1,,Fondations,Maîtriser les bases,,,,
+jour,1,1,,,,,,,
+theorie,1,1,Variables,Introduction,,,,15
+exercice,1,1,Exercice 1,Créer variables,"Objectif: ...",Indice,2,30
+        ```
+        
+        ### Conseils
+        
+        - ✅ Créez d'abord les semaines, puis les jours, puis les contenus
+        - ✅ Utilisez `99` pour le jour weekend
+        - ✅ Encodage UTF-8 obligatoire
+        - ✅ Les lignes vides et commentaires (#) sont ignorés
+        - ✅ Testez avec un petit programme d'abord
+        """)
+
+# Footer
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: gray;'>"
