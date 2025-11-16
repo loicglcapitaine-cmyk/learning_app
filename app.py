@@ -591,7 +591,6 @@ elif page == "📊 Ma progression":
         
         except Exception as e:
             st.error(f"❌ Erreur: {str(e)}")
-                st.success("✅ Progression exportée ! Cliquez pour télécharger")
     
     with col2:
         fichier_import = st.file_uploader("📤 Importer une progression", type=['json'])
