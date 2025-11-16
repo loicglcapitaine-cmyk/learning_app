@@ -18,7 +18,7 @@ class ProgrammeImporter:
         self.db = db
         self.cursor = db.conn.cursor()
     
-    def importer_depuis_csv(self, fichier_csv: str, 
+    def importer_depuis_csv(self, fichier_csv: str or io.StringIO, 
                            nom_programme: str, sujet: str) -> dict:
         """
         Importe un programme depuis un CSV
@@ -269,3 +269,120 @@ def generer_csv_depuis_programme_existant(db: DatabaseSchema, prog_id: str) -> s
                 ])
     
     return output.getvalue()
+
+
+def exporter_progression(db: DatabaseSchema, prog_id: str) -> str:
+    """
+    Exporte la progression d'un programme en JSON
+    
+    Args:
+        db: Connexion base de données
+        prog_id: ID du programme
+    
+    Returns:
+        JSON string de la progression
+    """
+    cursor = db.conn.cursor()
+    
+    # Récupérer toutes les progressions pour ce programme
+    cursor.execute("""
+        SELECT 
+            c.id as contenu_id,
+            c.titre,
+            c.type,
+            p.statut,
+            p.date_debut,
+            p.date_completion,
+            p.temps_passe,
+            p.notes
+        FROM contenus c
+        JOIN jours j ON c.jour_id = j.id
+        JOIN semaines s ON j.semaine_id = s.id
+        LEFT JOIN progression p ON p.contenu_id = c.id
+        WHERE s.programme_id = ?
+          AND p.statut IS NOT NULL
+        ORDER BY s.ordre, j.ordre, c.ordre
+    """, (prog_id,))
+    
+    progressions = []
+    for row in cursor.fetchall():
+        progressions.append({
+            'contenu_id': row['contenu_id'],
+            'titre': row['titre'],
+            'type': row['type'],
+            'statut': row['statut'],
+            'date_debut': row['date_debut'],
+            'date_completion': row['date_completion'],
+            'temps_passe': row['temps_passe'],
+            'notes': row['notes']
+        })
+    
+    export_data = {
+        'programme_id': prog_id,
+        'date_export': datetime.now().isoformat(),
+        'nb_contenus': len(progressions),
+        'progressions': progressions
+    }
+    
+    return json.dumps(export_data, indent=2, ensure_ascii=False)
+
+
+def importer_progression(db: DatabaseSchema, data: dict) -> dict:
+    """
+    Importe une progression depuis un JSON
+    
+    Args:
+        db: Connexion base de données
+        data: Données JSON de la progression
+    
+    Returns:
+        Statistiques d'import
+    """
+    cursor = db.conn.cursor()
+    
+    stats = {
+        'succes': False,
+        'nb_importes': 0,
+        'nb_ignores': 0,
+        'erreurs': []
+    }
+    
+    try:
+        progressions = data.get('progressions', [])
+        
+        for prog in progressions:
+            try:
+                # Vérifier si le contenu existe
+                cursor.execute("SELECT id FROM contenus WHERE id = ?", (prog['contenu_id'],))
+                if not cursor.fetchone():
+                    stats['nb_ignores'] += 1
+                    stats['erreurs'].append(f"Contenu {prog['contenu_id']} introuvable")
+                    continue
+                
+                # Insérer ou mettre à jour la progression
+                cursor.execute("""
+                    INSERT OR REPLACE INTO progression 
+                    (contenu_id, statut, date_debut, date_completion, temps_passe, notes)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    prog['contenu_id'],
+                    prog['statut'],
+                    prog.get('date_debut'),
+                    prog.get('date_completion'),
+                    prog.get('temps_passe', 0),
+                    prog.get('notes', '')
+                ))
+                
+                stats['nb_importes'] += 1
+            
+            except Exception as e:
+                stats['erreurs'].append(f"Erreur sur {prog.get('titre', '?')}: {str(e)}")
+        
+        db.conn.commit()
+        stats['succes'] = True
+    
+    except Exception as e:
+        stats['erreurs'].append(f"Erreur générale: {str(e)}")
+        db.conn.rollback()
+    
+    return stats
