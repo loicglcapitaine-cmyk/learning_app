@@ -18,7 +18,7 @@ class ProgrammeImporter:
         self.db = db
         self.cursor = db.conn.cursor()
     
-    def importer_depuis_csv(self, fichier_csv: str or io.StringIO, 
+    def importer_depuis_csv(self, fichier_csv: str, 
                            nom_programme: str, sujet: str) -> dict:
         """
         Importe un programme depuis un CSV
