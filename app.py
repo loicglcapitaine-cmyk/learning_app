@@ -477,23 +477,324 @@ elif page == "📅 Semaines":
 
 # Je vais créer les pages manquantes dans la prochaine partie
 
+
+# ============================================================================
+# PAGE : MA PROGRESSION
+# ============================================================================
+
 elif page == "📊 Ma progression":
-    st.markdown('<h1 class="gradient-title">📊 Ma progression</h1>', unsafe_allow_html=True)
-    # ... (code existant)
+    st.title("📊 Ma progression")
+    
+    # Vue d'ensemble
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric(
+            "Contenus terminés",
+            f"{stats['contenus_termines']}/{stats['total_contenus']}",
+            delta=f"{pourcentage:.1f}%"
+        )
+    
+    with col2:
+        st.metric("En cours", stats['contenus_en_cours'])
+    
+    with col3:
+        temps_passe = stats['temps_total_passe'] or 0
+        st.metric("Temps passé", format_duration(temps_passe))
+    
+    st.markdown("---")
+    
+    # Efficacité
+    if stats['temps_total_passe'] and stats['temps_total_estime']:
+        ratio = (stats['temps_total_passe'] / stats['temps_total_estime']) * 100
+        
+        st.subheader("⚡ Efficacité")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            if ratio < 80:
+                st.success(f"🚀 Excellent ! Vous êtes {100-ratio:.0f}% plus rapide que prévu")
+            elif ratio < 120:
+                st.info(f"✅ Bon rythme ! Vous êtes dans les temps ({ratio:.0f}%)")
+            else:
+                st.warning(f"⏰ Prenez votre temps, vous êtes à {ratio:.0f}% du temps estimé")
+        
+        with col2:
+            st.metric("Ratio", f"{ratio:.0f}%")
+    
+    st.markdown("---")
+    
+    # Progression par semaine
+    st.subheader("📚 Progression par semaine")
+    
+    cursor = db.conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT 
+                s.numero,
+                s.titre,
+                COUNT(c.id) as total,
+                COUNT(CASE WHEN p.statut = 'termine' THEN 1 END) as termines,
+                SUM(c.temps_estime) as temps_estime,
+                SUM(CASE WHEN p.statut = 'termine' THEN p.temps_passe ELSE 0 END) as temps_passe
+            FROM semaines s
+            JOIN jours j ON j.semaine_id = s.id
+            JOIN contenus c ON c.jour_id = j.id
+            LEFT JOIN progression p ON p.contenu_id = c.id
+            WHERE s.programme_id = ?
+            GROUP BY s.id
+            ORDER BY s.ordre
+        """, (PROG_ID,))
+        
+        resultats = cursor.fetchall()
+        
+        for row in resultats:
+            row = dict(row)
+            pct = (row['termines'] / row['total'] * 100) if row['total'] > 0 else 0
+            
+            with st.container():
+                col1, col2, col3 = st.columns([4, 1, 1])
+                
+                with col1:
+                    st.write(f"**Semaine {row['numero']}**: {row['titre']}")
+                    st.progress(pct / 100)
+                
+                with col2:
+                    st.metric("Contenus", f"{row['termines']}/{row['total']}")
+                
+                with col3:
+                    st.metric("Temps", format_duration(row['temps_passe'] or 0))
+            
+            st.markdown("")
+    finally:
+        cursor.close()
+    
+    st.markdown("---")
+    
+    # Conseils personnalisés
+    st.subheader("💡 Conseils personnalisés")
+    
+    if pourcentage < 25:
+        st.info("""
+        🌱 **Vous débutez !**
+        - Concentrez-vous sur les fondamentaux
+        - Faites TOUS les exercices, ne sautez rien
+        - Prenez le temps de bien comprendre
+        """)
+    elif pourcentage < 50:
+        st.success("""
+        🚀 **Bon rythme !**
+        - Continuez ainsi
+        - Revoyez les concepts pas encore maîtrisés
+        - Commencez à créer vos propres petits projets
+        """)
+    elif pourcentage < 75:
+        st.success("""
+        ⭐ **Excellent progrès !**
+        - Vous pouvez approfondir les concepts avancés
+        - Challengez-vous avec des projets plus complexes
+        - Explorez des bibliothèques tierces
+        """)
+    else:
+        st.success("""
+        🏆 **Bravo ! Vous maîtrisez les fondamentaux**
+        - Prêt pour des projets ambitieux
+        - Explorez des frameworks (Django, Flask, FastAPI)
+        - Contribuez à des projets open source
+        """)
+
+# ============================================================================
+# PAGE : RECHERCHE
+# ============================================================================
 
 elif page == "🔍 Recherche":
-    st.markdown('<h1 class="gradient-title">🔍 Recherche</h1>', unsafe_allow_html=True)
-    # ... (code existant avec menu déroulant)
+    st.title("🔍 Recherche de contenus")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        terme = st.text_input("🔎 Rechercher un contenu (titre ou description)", "", key="search")
+    
+    with col2:
+        filtre_type = st.selectbox(
+            "Type",
+            ["Tous", "Théorie", "Exercice", "Projet", "Ressource"]
+        )
+    
+    if terme:
+        cursor = db.conn.cursor()
+        
+        try:
+            # Construction de la requête selon le filtre
+            type_condition = ""
+            if filtre_type != "Tous":
+                type_map = {
+                    "Théorie": "theorie",
+                    "Exercice": "exercice",
+                    "Projet": "projet",
+                    "Ressource": "ressource"
+                }
+                type_condition = f" AND type = '{type_map[filtre_type]}'"
+            
+            cursor.execute(f"""
+                SELECT * FROM contenus
+                WHERE (titre LIKE ? OR description LIKE ?)
+                {type_condition}
+                ORDER BY ordre
+                LIMIT 20
+            """, (f"%{terme}%", f"%{terme}%"))
+            
+            resultats = [dict(row) for row in cursor.fetchall()]
+        finally:
+            cursor.close()
+        
+        if resultats:
+            st.success(f"✅ {len(resultats)} résultat(s) trouvé(s)")
+            
+            for contenu in resultats:
+                with st.expander(
+                    f"{'📖' if contenu['type'] == 'theorie' else '✏️' if contenu['type'] == 'exercice' else '🎯' if contenu['type'] == 'projet' else '🔗'} {contenu['titre']}"
+                ):
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        prog = progression_service.prog_dao.get_progression(contenu['id'])
+                        
+                        if prog and prog['statut'] == 'termine':
+                            st.success("✅ Terminé")
+                        elif prog and prog['statut'] == 'en_cours':
+                            st.info("🔄 En cours")
+                        else:
+                            st.warning("⬜ Non commencé")
+                        
+                        if contenu['description']:
+                            st.write(contenu['description'])
+                        
+                        if contenu['difficulte']:
+                            st.write(f"**Difficulté**: {'⭐' * contenu['difficulte']}")
+                        
+                        if contenu['temps_estime']:
+                            st.write(f"**Temps estimé**: {format_duration(contenu['temps_estime'])}")
+                    
+                    with col2:
+                        if not prog or prog['statut'] != 'termine':
+                            if st.button("✅ Valider", key=f"val_{contenu['id']}", use_container_width=True):
+                                st.session_state['valider_contenu_id'] = contenu['id']
+                                st.rerun()
+        else:
+            st.warning(f"Aucun résultat pour '{terme}'")
+
+# ============================================================================
+# PAGE : VALIDER UN CONTENU
+# ============================================================================
 
 elif page == "✅ Valider un contenu":
-    st.markdown('<h1 class="gradient-title">✅ Valider un contenu</h1>', unsafe_allow_html=True)
-    # ... (code existant avec menu déroulant)
+    st.title("✅ Valider un contenu")
+    
+    st.info("💡 Recherchez un contenu pour le marquer comme terminé")
+    
+    # Recherche
+    terme = st.text_input("🔎 Rechercher", "", key="search_validation")
+    
+    if terme:
+        cursor = db.conn.cursor()
+        
+        try:
+            cursor.execute("""
+                SELECT c.*
+                FROM contenus c
+                LEFT JOIN progression p ON p.contenu_id = c.id
+                WHERE (c.titre LIKE ? OR c.description LIKE ?)
+                  AND (p.statut IS NULL OR p.statut != 'termine')
+                ORDER BY c.ordre
+                LIMIT 10
+            """, (f"%{terme}%", f"%{terme}%"))
+            
+            resultats = [dict(row) for row in cursor.fetchall()]
+        finally:
+            cursor.close()
+        
+        if resultats:
+            contenu_selectionne = st.selectbox(
+                "Choisissez un contenu à valider",
+                options=range(len(resultats)),
+                format_func=lambda i: f"{'📖' if resultats[i]['type'] == 'theorie' else '✏️' if resultats[i]['type'] == 'exercice' else '🎯'} {resultats[i]['titre']}",
+                key="select_contenu_validation"
+            )
+            
+            contenu = resultats[contenu_selectionne]
+            
+            st.markdown("---")
+            st.markdown(f"### {contenu['titre']}")
+            
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                if contenu['description']:
+                    st.write(contenu['description'])
+                
+                if contenu['difficulte']:
+                    st.write(f"**Difficulté**: {'⭐' * contenu['difficulte']}")
+            
+            with col2:
+                if contenu['temps_estime']:
+                    st.metric("⏱️ Temps estimé", format_duration(contenu['temps_estime']))
+            
+            # Vérifier prérequis
+            prerequis_ok, messages = programme_service.verifier_prerequis(contenu['id'])
+            
+            if not prerequis_ok:
+                st.warning("⚠️ Prérequis non validés")
+                for msg in messages:
+                    st.write(msg)
+            
+            # Formulaire de validation
+            st.markdown("---")
+            
+            with st.form("validation_form"):
+                st.subheader("📝 Valider le contenu")
+                
+                temps_passe = st.number_input(
+                    "⏱️ Temps réellement passé (en minutes)",
+                    min_value=1,
+                    value=contenu['temps_estime'] or 30,
+                    step=5
+                )
+                
+                notes = st.text_area("📝 Notes personnelles (optionnel)", "", height=100)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    submitted = st.form_submit_button("✅ Valider ce contenu", use_container_width=True)
+                
+                with col2:
+                    cancel = st.form_submit_button("❌ Annuler", use_container_width=True)
+                
+                if submitted:
+                    progression_service.prog_dao.marquer_termine(
+                        contenu['id'],
+                        temps_passe,
+                        notes
+                    )
+                    st.success(f"🎉 '{contenu['titre']}' marqué comme terminé!")
+                    st.balloons()
+                    
+                    # Afficher contenus débloqués
+                    dependants = programme_service.contenu_dao.get_contenus_dependants(contenu['id'])
+                    if dependants:
+                        st.info(f"🔓 Vous avez débloqué {len(dependants)} nouveau(x) contenu(s) !")
+                
+                if cancel:
+                    st.info("Validation annulée")
+        else:
+            st.warning("Aucun contenu non terminé trouvé pour cette recherche")
 
-elif page == "📥 Importer un programme":
-    st.markdown('<h1 class="gradient-title">📥 Importer un nouveau programme</h1>', unsafe_allow_html=True)
-    st.info("🚧 Cette fonctionnalité est en cours de développement")
 
-# Footer
+# ============================================================================
+# FOOTER
+# ============================================================================
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: gray;'>"
