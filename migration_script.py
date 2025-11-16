@@ -403,18 +403,153 @@ class ProgrammeMigrator:
                         "exercices": [
                             {
                                 "titre": "Créer 10 variables de types différents",
-                                "enonce": "Créez un programme qui déclare et affiche 10 variables...",
+                                "enonce": """**Objectif**: Maîtriser la déclaration de variables et les types de données en Python.
+
+**Instructions détaillées**:
+
+1. **Variables numériques entières (int)** :
+   - Créez `age` = votre âge
+   - Créez `annee_naissance` = année de votre naissance
+   - Créez `nombre_freres_soeurs` = nombre de frères et sœurs
+
+2. **Variables numériques décimales (float)** :
+   - Créez `taille` = votre taille en mètres (ex: 1.75)
+   - Créez `temperature` = température actuelle (ex: 22.5)
+
+3. **Variables textuelles (str)** :
+   - Créez `prenom` = votre prénom
+   - Créez `ville` = votre ville
+   - Créez `citation` = une citation que vous aimez
+
+4. **Variables booléennes (bool)** :
+   - Créez `est_majeur` = True ou False selon votre âge
+   - Créez `aime_python` = True
+
+**Bonus** :
+Pour chaque variable, affichez :
+```python
+print(f"Variable: {ma_variable}, Type: {type(ma_variable)}, Valeur: {ma_variable}")
+```
+
+**Résultat attendu** :
+```
+Variable: age, Type: <class 'int'>, Valeur: 25
+Variable: taille, Type: <class 'float'>, Valeur: 1.75
+Variable: prenom, Type: <class 'str'>, Valeur: Jean
+...
+```
+
+**Critères de réussite** :
+✅ 10 variables créées de types variés
+✅ Affichage du type de chaque variable
+✅ Code exécutable sans erreur""",
                                 "indice": "Utilisez print(f'Variable: {ma_var}, Type: {type(ma_var)}')"
                             },
                             {
                                 "titre": "Calculatrice simple",
-                                "enonce": "Créez un programme qui demande deux nombres...",
-                                "indice": "Utilisez input() puis float() pour convertir"
+                                "enonce": """**Objectif**: Créer une calculatrice interactive qui demande deux nombres et effectue les 4 opérations de base.
+
+**Spécifications** :
+
+1. **Demander les nombres** :
+   - Demandez le premier nombre à l'utilisateur
+   - Demandez le deuxième nombre à l'utilisateur
+   - Convertissez-les en `float` pour accepter les décimales
+
+2. **Effectuer les calculs** :
+   - Addition : `nombre1 + nombre2`
+   - Soustraction : `nombre1 - nombre2`
+   - Multiplication : `nombre1 * nombre2`
+   - Division : `nombre1 / nombre2`
+
+3. **Afficher les résultats** :
+   Format attendu :
+   ```
+   Premier nombre: 10
+   Deuxième nombre: 3
+   
+   === RÉSULTATS ===
+   10 + 3 = 13
+   10 - 3 = 7
+   10 * 3 = 30
+   10 / 3 = 3.33
+   ```
+
+**Code de base** :
+```python
+# Demander les nombres
+nombre1 = float(input("Premier nombre: "))
+nombre2 = float(input("Deuxième nombre: "))
+
+# À vous de jouer !
+```
+
+**Bonus** :
+- Ajoutez la division entière : `nombre1 // nombre2`
+- Ajoutez le modulo (reste) : `nombre1 % nombre2`
+- Ajoutez la puissance : `nombre1 ** nombre2`
+- Gérez le cas de la division par zéro
+
+**Critères de réussite** :
+✅ Programme demande bien 2 nombres
+✅ Les 4 opérations sont calculées
+✅ Affichage clair et formaté
+✅ Fonctionne avec des décimales""",
+                                "indice": "Utilisez float(input()) pour convertir l'entrée utilisateur en nombre"
                             },
                             {
                                 "titre": "Message personnalisé",
-                                "enonce": "Demandez nom, prénom, âge, ville...",
-                                "indice": "Utilisez les f-strings"
+                                "enonce": """**Objectif**: Créer un programme qui collecte des informations personnelles et génère un message de bienvenue personnalisé.
+
+**Étape 1 : Collecter les informations**
+Demandez à l'utilisateur :
+- Son prénom
+- Son nom de famille
+- Son âge
+- Sa ville de résidence
+
+**Étape 2 : Créer le message**
+Générez un message qui contient toutes ces informations de manière naturelle.
+
+**Exemple d'exécution** :
+```
+=== FORMULAIRE D'INSCRIPTION ===
+Prénom: Jean
+Nom: Dupont
+Âge: 25
+Ville: Paris
+
+=== MESSAGE DE BIENVENUE ===
+Bonjour Jean Dupont !
+Vous avez 25 ans et habitez à Paris.
+Bienvenue dans notre programme d'apprentissage Python !
+```
+
+**Structure recommandée** :
+```python
+# Collecte des informations
+prenom = input("Prénom: ")
+# ... à compléter
+
+# Génération du message
+message = f"Bonjour {prenom} {nom} !"
+# ... à compléter
+
+print(message)
+```
+
+**Bonus** :
+- Ajoutez une vérification : si l'âge < 18, ajoutez "Tu es mineur(e)"
+- Mettez la première lettre en majuscule même si l'utilisateur écrit en minuscules
+- Ajoutez une question "Êtes-vous étudiant ? (oui/non)" et adaptez le message
+- Calculez l'année de naissance à partir de l'âge
+
+**Critères de réussite** :
+✅ 4 informations collectées
+✅ Message personnalisé et formaté
+✅ Utilisation des f-strings
+✅ Affichage professionnel""",
+                                "indice": "Utilisez les f-strings : f'Bonjour {prenom} {nom}!'"
                             }
                         ],
                         "ressources": ["Documentation Python officielle"]
@@ -428,13 +563,214 @@ class ProgrammeMigrator:
                         "exercices": [
                             {
                                 "titre": "Convertisseur température",
-                                "enonce": "Créez un convertisseur Celsius/Fahrenheit...",
-                                "indice": "Utilisez if/else pour choisir la formule"
+                                "enonce": """**Objectif**: Créer un convertisseur bidirectionnel Celsius ↔ Fahrenheit
+
+**Contexte** :
+Les formules de conversion sont :
+- **Celsius → Fahrenheit** : (C × 9/5) + 32
+- **Fahrenheit → Celsius** : (F - 32) × 5/9
+
+**Spécifications** :
+
+1. **Menu de choix** :
+   ```
+   === CONVERTISSEUR DE TEMPÉRATURE ===
+   1. Celsius vers Fahrenheit
+   2. Fahrenheit vers Celsius
+   Votre choix (1 ou 2): _
+   ```
+
+2. **Demander la température** :
+   - Demander la valeur à convertir
+   - Afficher le résultat avec 2 décimales
+
+**Exemple d'exécution 1** :
+```
+Votre choix: 1
+Température en Celsius: 25
+25°C = 77.0°F
+```
+
+**Exemple d'exécution 2** :
+```
+Votre choix: 2
+Température en Fahrenheit: 77
+77°F = 25.0°C
+```
+
+**Structure de base** :
+```python
+print("=== CONVERTISSEUR DE TEMPÉRATURE ===")
+print("1. Celsius vers Fahrenheit")
+print("2. Fahrenheit vers Celsius")
+
+choix = input("Votre choix (1 ou 2): ")
+
+if choix == "1":
+    celsius = float(input("Température en Celsius: "))
+    # Votre code ici
+    
+elif choix == "2":
+    fahrenheit = float(input("Température en Fahrenheit: "))
+    # Votre code ici
+```
+
+**Bonus** :
+- Ajoutez la conversion vers Kelvin
+- Ajoutez des validations (température > -273.15°C)
+- Créez une boucle pour refaire des conversions
+- Affichez des messages selon la température (chaud/froid)
+
+**Critères de réussite** :
+✅ Menu de choix fonctionnel
+✅ Les deux conversions fonctionnent
+✅ Résultats affichés avec 2 décimales
+✅ Symboles °C et °F affichés""",
+                                "indice": "Utilisez if/elif pour choisir la formule selon le choix"
                             },
                             {
                                 "titre": "Calculateur IMC",
-                                "enonce": "Calculez l'IMC avec interprétation...",
-                                "indice": "Utilisez round(nombre, 2)"
+                                "enonce": """**Objectif**: Calculer l'Indice de Masse Corporelle et donner une interprétation médicale
+
+**Contexte** :
+L'IMC (Indice de Masse Corporelle) est calculé par : **IMC = poids / (taille²)**
+- Poids en kilogrammes
+- Taille en mètres
+
+**Classification OMS** :
+- IMC < 18.5 : Insuffisance pondérale
+- IMC 18.5-24.9 : Poids normal
+- IMC 25-29.9 : Surpoids
+- IMC ≥ 30 : Obésité
+
+**Spécifications** :
+
+1. **Collecte des données** :
+   ```
+   === CALCULATEUR D'IMC ===
+   Entrez votre poids (kg): 70
+   Entrez votre taille (m): 1.75
+   ```
+
+2. **Calcul et affichage** :
+   ```
+   Votre IMC: 22.86
+   Interprétation: Poids normal
+   Vous êtes dans une fourchette de poids santé.
+   ```
+
+**Structure complète** :
+```python
+print("=== CALCULATEUR D'IMC ===")
+
+# 1. Demander les données
+poids = float(input("Entrez votre poids (kg): "))
+taille = float(input("Entrez votre taille (m): "))
+
+# 2. Calculer l'IMC
+imc = poids / (taille ** 2)
+imc_arrondi = round(imc, 2)
+
+# 3. Interpréter
+if imc < 18.5:
+    categorie = "Insuffisance pondérale"
+    message = "Vous pourriez avoir besoin de prendre du poids."
+elif imc < 25:
+    categorie = "Poids normal"
+    message = "Vous êtes dans une fourchette de poids santé."
+# À compléter...
+
+# 4. Afficher
+print(f"Votre IMC: {imc_arrondi}")
+print(f"Interprétation: {categorie}")
+print(message)
+```
+
+**Bonus** :
+- Ajoutez des emoji selon la catégorie (😊 pour normal, ⚠️ pour les autres)
+- Calculez le poids idéal pour un IMC de 22
+- Ajoutez une validation (poids et taille > 0)
+- Créez un graphique ASCII montrant la position sur l'échelle
+
+**Critères de réussite** :
+✅ IMC calculé correctement
+✅ Résultat arrondi à 2 décimales
+✅ Interprétation selon les 4 catégories
+✅ Message personnalisé affiché""",
+                                "indice": "Utilisez round(nombre, 2) pour arrondir à 2 décimales"
+                            },
+                            {
+                                "titre": "Vérificateur de nombre",
+                                "enonce": """**Objectif**: Analyser un nombre et déterminer ses propriétés mathématiques
+
+**Spécifications** :
+
+Créez un programme qui demande un nombre entier et vérifie :
+1. S'il est **pair** ou **impair**
+2. S'il est **divisible par 3**
+3. S'il est **divisible par 5**
+4. S'il est **divisible par 7**
+
+**Exemple d'exécution 1** :
+```
+Entrez un nombre: 15
+
+Analyse du nombre 15:
+✓ Nombre impair
+✓ Divisible par 3
+✓ Divisible par 5
+✗ Non divisible par 7
+```
+
+**Exemple d'exécution 2** :
+```
+Entrez un nombre: 14
+
+Analyse du nombre 14:
+✓ Nombre pair
+✗ Non divisible par 3
+✗ Non divisible par 5
+✓ Divisible par 7
+```
+
+**Rappels mathématiques** :
+- Un nombre est **pair** si `nombre % 2 == 0`
+- Un nombre est **divisible par N** si `nombre % N == 0`
+
+**Structure recommandée** :
+```python
+nombre = int(input("Entrez un nombre: "))
+
+print(f"\\nAnalyse du nombre {nombre}:")
+
+# Pair ou impair
+if nombre % 2 == 0:
+    print("✓ Nombre pair")
+else:
+    print("✗ Nombre impair")
+
+# Divisible par 3
+if nombre % 3 == 0:
+    print("✓ Divisible par 3")
+else:
+    print("✗ Non divisible par 3")
+
+# À compléter pour 5 et 7...
+```
+
+**Bonus** :
+- Ajoutez la vérification de divisibilité par 10
+- Si divisible par 3 ET 5, affichez "Divisible par 15 !"
+- Vérifiez si c'est un nombre premier
+- Affichez tous les diviseurs du nombre
+- Ajoutez des couleurs (si vous utilisez colorama)
+
+**Critères de réussite** :
+✅ Vérification pair/impair
+✅ Vérification divisibilité par 3, 5, 7
+✅ Affichage clair avec ✓ et ✗
+✅ Fonctionne avec n'importe quel nombre entier""",
+                                "indice": "L'opérateur modulo % donne le reste : 15 % 3 = 0 donc divisible"
                             }
                         ]
                     },
