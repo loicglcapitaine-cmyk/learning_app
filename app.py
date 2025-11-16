@@ -595,7 +595,7 @@ elif page == "📊 Ma progression":
         fichier_import = st.file_uploader("📤 Importer une progression", type=['json'])
         if fichier_import:
             if st.button("🔄 Importer", use_container_width=True):
-                from import_programme import importer_progression
+                #from import_programme import importer_progression
                 import json as json_lib
                 
                 try:
