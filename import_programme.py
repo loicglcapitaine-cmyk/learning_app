@@ -1,388 +1,456 @@
-"""
-Module d'importation de programmes depuis CSV
-Format accessible à tous pour créer facilement de nouveaux programmes
-"""
+# ============================================================
+# FICHIER: import_programme.py
+# ============================================================
+# Fonctions d'import et d'export de programmes d'entraînement
+# ============================================================
 
-import csv
-import io
-from database_schema import DatabaseSchema, generate_id
+import json
+import sqlite3
 from datetime import datetime
+import streamlit as st
 
-class ProgrammeImporter:
+
+# ============================================================
+# FONCTION D'EXPORT DE PROGRESSION (NOUVELLE)
+# ============================================================
+
+def exporter_progression(db_path, prog_id):
     """
-    Importe un programme depuis un fichier CSV
-    Format simple et accessible à tous
-    """
-    
-    def __init__(self, db: DatabaseSchema):
-        self.db = db
-        self.cursor = db.conn.cursor()
-    
-    def importer_depuis_csv(self, fichier_csv: str or io.StringIO, 
-                           nom_programme: str, sujet: str) -> dict:
-        """
-        Importe un programme depuis un CSV
-        
-        Format CSV attendu (sans header) :
-        Type, Semaine, Jour, Titre, Description, Enonce, Indice, Difficulte, TempsEstime
-        
-        Exemple:
-        programme,,,Python 30 jours,Programme complet Python,,,,
-        semaine,1,,Fondations,Maîtriser les bases,,,,
-        theorie,1,1,Variables et types,Introduction aux variables,,,,15
-        exercice,1,1,Créer 10 variables,Exercice pratique,Créez 10 variables...,Utilisez print(),2,30
-        
-        Returns:
-            dict avec statistiques d'import
-        """
-        
-        stats = {
-            'succes': False,
-            'programme_id': None,
-            'nb_semaines': 0,
-            'nb_jours': 0,
-            'nb_contenus': 0,
-            'erreurs': []
-        }
-        
-        try:
-            # Lire le CSV
-            if isinstance(fichier_csv, str):
-                with open(fichier_csv, 'r', encoding='utf-8') as f:
-                    lecteur = csv.reader(f)
-                    lignes = list(lecteur)
-            else:
-                lecteur = csv.reader(fichier_csv)
-                lignes = list(lecteur)
-            
-            # Variables de contexte
-            prog_id = generate_id("prog", sujet, "custom")
-            semaines_map = {}  # {numero: id}
-            jours_map = {}     # {(semaine_num, jour_num): id}
-            
-            # Créer le programme
-            self.cursor.execute("""
-                INSERT INTO programmes (id, titre, sujet, duree_jours, niveau, temps_quotidien, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                prog_id,
-                nom_programme,
-                sujet,
-                30,  # Par défaut
-                'débutant',
-                2,
-                f"Programme importé le {datetime.now().strftime('%Y-%m-%d')}"
-            ))
-            
-            stats['programme_id'] = prog_id
-            
-            # Parser les lignes
-            for i, ligne in enumerate(lignes, 1):
-                if not ligne or len(ligne) < 4:
-                    continue
-                
-                type_ligne = ligne[0].strip().lower()
-                
-                try:
-                    if type_ligne == 'semaine':
-                        self._creer_semaine(ligne, prog_id, semaines_map)
-                        stats['nb_semaines'] += 1
-                    
-                    elif type_ligne == 'jour':
-                        self._creer_jour(ligne, semaines_map, jours_map)
-                        stats['nb_jours'] += 1
-                    
-                    elif type_ligne in ['theorie', 'exercice', 'projet', 'ressource']:
-                        self._creer_contenu(ligne, jours_map, type_ligne)
-                        stats['nb_contenus'] += 1
-                
-                except Exception as e:
-                    stats['erreurs'].append(f"Ligne {i}: {str(e)}")
-            
-            self.db.conn.commit()
-            stats['succes'] = True
-            
-        except Exception as e:
-            stats['erreurs'].append(f"Erreur générale: {str(e)}")
-            self.db.conn.rollback()
-        
-        return stats
-    
-    def _creer_semaine(self, ligne, prog_id, semaines_map):
-        """Crée une semaine"""
-        numero = int(ligne[1])
-        titre = ligne[3]
-        objectif = ligne[4] if len(ligne) > 4 else ""
-        
-        sem_id = generate_id("sem", numero, prog_id)
-        
-        self.cursor.execute("""
-            INSERT INTO semaines (id, programme_id, numero, titre, objectif, temps_quotidien, ordre)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (sem_id, prog_id, numero, titre, objectif, "2h", numero))
-        
-        semaines_map[numero] = sem_id
-    
-    def _creer_jour(self, ligne, semaines_map, jours_map):
-        """Crée un jour"""
-        semaine_num = int(ligne[1])
-        jour_num = int(ligne[2])
-        nom_jour = f"jour_{jour_num}" if jour_num < 90 else "weekend"
-        type_jour = ligne[4] if len(ligne) > 4 and ligne[4] else "normal"
-        
-        if semaine_num not in semaines_map:
-            raise ValueError(f"Semaine {semaine_num} non trouvée")
-        
-        sem_id = semaines_map[semaine_num]
-        jour_id = generate_id("jour", nom_jour, sem_id)
-        
-        self.cursor.execute("""
-            INSERT INTO jours (id, semaine_id, nom, type, ordre)
-            VALUES (?, ?, ?, ?, ?)
-        """, (jour_id, sem_id, nom_jour, type_jour, jour_num))
-        
-        jours_map[(semaine_num, jour_num)] = jour_id
-    
-    def _creer_contenu(self, ligne, jours_map, type_contenu):
-        """Crée un contenu"""
-        semaine_num = int(ligne[1])
-        jour_num = int(ligne[2])
-        titre = ligne[3]
-        description = ligne[4] if len(ligne) > 4 else ""
-        enonce = ligne[5] if len(ligne) > 5 else ""
-        indice = ligne[6] if len(ligne) > 6 else ""
-        difficulte = int(ligne[7]) if len(ligne) > 7 and ligne[7] else 2
-        temps_estime = int(ligne[8]) if len(ligne) > 8 and ligne[8] else 30
-        
-        if (semaine_num, jour_num) not in jours_map:
-            raise ValueError(f"Jour {jour_num} de semaine {semaine_num} non trouvé")
-        
-        jour_id = jours_map[(semaine_num, jour_num)]
-        
-        # Compter l'ordre
-        self.cursor.execute("""
-            SELECT COUNT(*) FROM contenus WHERE jour_id = ?
-        """, (jour_id,))
-        ordre = self.cursor.fetchone()[0] + 1
-        
-        contenu_id = generate_id("cont", type_contenu, ordre, jour_id)
-        
-        self.cursor.execute("""
-            INSERT INTO contenus (id, jour_id, type, titre, description, 
-                                 enonce, indice, difficulte, temps_estime, ordre)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            contenu_id, jour_id, type_contenu, titre, description,
-            enonce, indice, difficulte, temps_estime, ordre
-        ))
-    
-    def generer_template_csv(self) -> str:
-        """
-        Génère un template CSV avec exemples
-        
-        Returns:
-            Contenu CSV template
-        """
-        template = """Type,Semaine,Jour,Titre,Description,Enonce,Indice,Difficulte,TempsEstime
-semaine,1,,Fondations JavaScript,Maîtriser les bases du langage,,,,
-jour,1,1,,,,,
-theorie,1,1,Variables : var let const,Comprendre les différences,,,,15
-exercice,1,1,Déclarations de variables,Créer des variables,Créez 10 variables avec let et const,Utilisez console.log(),2,30
-jour,1,2,,,,,
-theorie,1,2,Fonctions,Créer et utiliser des fonctions,,,,20
-exercice,1,2,Ma première fonction,Créer une fonction,Créez une fonction qui calcule le carré,function carre(n) { return n*n; },2,25
-jour,1,99,,,,,
-projet,1,99,Calculatrice JavaScript,Projet de weekend,Créez une calculatrice complète avec HTML/CSS/JS,,4,180
-
-# INSTRUCTIONS:
-# - Type: semaine, jour, theorie, exercice, projet, ressource
-# - Semaine: Numéro de la semaine (1, 2, 3...)
-# - Jour: Numéro du jour (1-5 pour jours normaux, 99 pour weekend)
-# - Pour 'semaine': remplir Titre et Description
-# - Pour 'jour': juste Semaine et Jour (crée la structure)
-# - Pour contenus: tous les champs sauf Enonce (optionnel)
-# - Difficulte: 1-5 (1=facile, 5=expert)
-# - TempsEstime: en minutes
-# - Lignes vides et commentaires (#) sont ignorés
-"""
-        return template
-
-
-def generer_csv_depuis_programme_existant(db: DatabaseSchema, prog_id: str) -> str:
-    """
-    Exporte un programme existant en CSV pour le réutiliser comme template
+    Exporte la progression complète d'un programme au format JSON
     
     Args:
-        db: Connexion base de données
+        db_path: Chemin vers la base de données ou connexion SQLite
         prog_id: ID du programme à exporter
     
     Returns:
-        Contenu CSV
+        str: Données JSON formatées
     """
-    cursor = db.conn.cursor()
     
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Header
-    writer.writerow(["Type", "Semaine", "Jour", "Titre", "Description", "Enonce", "Indice", "Difficulte", "TempsEstime"])
-    
-    # Programme
-    cursor.execute("SELECT * FROM programmes WHERE id = ?", (prog_id,))
-    prog = cursor.fetchone()
-    if not prog:
-        return "# Programme non trouvé"
-    
-    # Semaines
-    cursor.execute("""
-        SELECT * FROM semaines WHERE programme_id = ? ORDER BY ordre
-    """, (prog_id,))
-    
-    for semaine in cursor.fetchall():
-        writer.writerow(["semaine", semaine['numero'], "", semaine['titre'], semaine['objectif'], "", "", "", ""])
-        
-        # Jours de cette semaine
-        cursor.execute("""
-            SELECT * FROM jours WHERE semaine_id = ? ORDER BY ordre
-        """, (semaine['id'],))
-        
-        for jour in cursor.fetchall():
-            jour_num = 99 if jour['type'] == 'weekend' else jour['ordre']
-            writer.writerow(["jour", semaine['numero'], jour_num, "", "", "", "", "", ""])
-            
-            # Contenus de ce jour
-            cursor.execute("""
-                SELECT * FROM contenus WHERE jour_id = ? ORDER BY ordre
-            """, (jour['id'],))
-            
-            for contenu in cursor.fetchall():
-                writer.writerow([
-                    contenu['type'],
-                    semaine['numero'],
-                    jour_num,
-                    contenu['titre'],
-                    contenu['description'] or "",
-                    contenu['enonce'] or "",
-                    contenu['indice'] or "",
-                    contenu['difficulte'] or "",
-                    contenu['temps_estime'] or ""
-                ])
-    
-    return output.getvalue()
-
-
-def exporter_progression(db: DatabaseSchema, prog_id: str) -> str:
-    """
-    Exporte la progression d'un programme en JSON
-    
-    Args:
-        db: Connexion base de données
-        prog_id: ID du programme
-    
-    Returns:
-        JSON string de la progression
-    """
-    cursor = db.conn.cursor()
-    
-    # Récupérer toutes les progressions pour ce programme
-    cursor.execute("""
-        SELECT 
-            c.id as contenu_id,
-            c.titre,
-            c.type,
-            p.statut,
-            p.date_debut,
-            p.date_completion,
-            p.temps_passe,
-            p.notes
-        FROM contenus c
-        JOIN jours j ON c.jour_id = j.id
-        JOIN semaines s ON j.semaine_id = s.id
-        LEFT JOIN progression p ON p.contenu_id = c.id
-        WHERE s.programme_id = ?
-          AND p.statut IS NOT NULL
-        ORDER BY s.ordre, j.ordre, c.ordre
-    """, (prog_id,))
-    
-    progressions = []
-    for row in cursor.fetchall():
-        progressions.append({
-            'contenu_id': row['contenu_id'],
-            'titre': row['titre'],
-            'type': row['type'],
-            'statut': row['statut'],
-            'date_debut': row['date_debut'],
-            'date_completion': row['date_completion'],
-            'temps_passe': row['temps_passe'],
-            'notes': row['notes']
-        })
-    
-    export_data = {
-        'programme_id': prog_id,
-        'date_export': datetime.now().isoformat(),
-        'nb_contenus': len(progressions),
-        'progressions': progressions
-    }
-    
-    return json.dumps(export_data, indent=2, ensure_ascii=False)
-
-
-def importer_progression(db: DatabaseSchema, data: dict) -> dict:
-    """
-    Importe une progression depuis un JSON
-    
-    Args:
-        db: Connexion base de données
-        data: Données JSON de la progression
-    
-    Returns:
-        Statistiques d'import
-    """
-    cursor = db.conn.cursor()
-    
-    stats = {
-        'succes': False,
-        'nb_importes': 0,
-        'nb_ignores': 0,
-        'erreurs': []
-    }
+    # Gestion de la connexion
+    if isinstance(db_path, str):
+        conn = sqlite3.connect(db_path)
+        should_close = True
+    else:
+        conn = db_path
+        should_close = False
     
     try:
-        progressions = data.get('progressions', [])
+        cursor = conn.cursor()
         
-        for prog in progressions:
-            try:
-                # Vérifier si le contenu existe
-                cursor.execute("SELECT id FROM contenus WHERE id = ?", (prog['contenu_id'],))
-                if not cursor.fetchone():
-                    stats['nb_ignores'] += 1
-                    stats['erreurs'].append(f"Contenu {prog['contenu_id']} introuvable")
-                    continue
-                
-                # Insérer ou mettre à jour la progression
-                cursor.execute("""
-                    INSERT OR REPLACE INTO progression 
-                    (contenu_id, statut, date_debut, date_completion, temps_passe, notes)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    prog['contenu_id'],
-                    prog['statut'],
-                    prog.get('date_debut'),
-                    prog.get('date_completion'),
-                    prog.get('temps_passe', 0),
-                    prog.get('notes', '')
-                ))
-                
-                stats['nb_importes'] += 1
+        # Récupération du programme
+        cursor.execute("""
+            SELECT nom, description, date_debut, date_fin, statut 
+            FROM programme 
+            WHERE id = ?
+        """, (prog_id,))
+        
+        prog_data = cursor.fetchone()
+        
+        if not prog_data:
+            return json.dumps({
+                "erreur": "Programme non trouvé",
+                "prog_id": prog_id
+            }, indent=2, ensure_ascii=False)
+        
+        # Structure principale
+        export_data = {
+            "programme": {
+                "id": prog_id,
+                "nom": prog_data[0],
+                "description": prog_data[1],
+                "date_debut": prog_data[2],
+                "date_fin": prog_data[3],
+                "statut": prog_data[4]
+            },
+            "date_export": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "nombre_seances": 0,
+            "seances": []
+        }
+        
+        # Récupération des séances
+        cursor.execute("""
+            SELECT id, nom, date, commentaire, duree_min, statut 
+            FROM seance 
+            WHERE programme_id = ? 
+            ORDER BY date
+        """, (prog_id,))
+        
+        seances = cursor.fetchall()
+        export_data["nombre_seances"] = len(seances)
+        
+        # Traitement de chaque séance
+        for seance in seances:
+            seance_id, nom_seance, date_seance, commentaire, duree, statut = seance
             
-            except Exception as e:
-                stats['erreurs'].append(f"Erreur sur {prog.get('titre', '?')}: {str(e)}")
+            seance_data = {
+                "id": seance_id,
+                "nom": nom_seance,
+                "date": date_seance,
+                "duree_minutes": duree,
+                "statut": statut,
+                "commentaire": commentaire,
+                "nombre_exercices": 0,
+                "exercices": []
+            }
+            
+            # Récupération des exercices
+            cursor.execute("""
+                SELECT e.id, e.nom, se.ordre, se.notes, se.id as seance_exercice_id
+                FROM seance_exercice se
+                JOIN exercice e ON se.exercice_id = e.id
+                WHERE se.seance_id = ?
+                ORDER BY se.ordre
+            """, (seance_id,))
+            
+            exercices = cursor.fetchall()
+            seance_data["nombre_exercices"] = len(exercices)
+            
+            # Traitement de chaque exercice
+            for exercice in exercices:
+                exercice_id, nom_exercice, ordre, notes, seance_exercice_id = exercice
+                
+                exercice_data = {
+                    "id": exercice_id,
+                    "nom": nom_exercice,
+                    "ordre": ordre,
+                    "notes": notes,
+                    "nombre_series": 0,
+                    "series": []
+                }
+                
+                # Récupération des séries
+                cursor.execute("""
+                    SELECT 
+                        numero_serie,
+                        poids_kg,
+                        repetitions,
+                        duree_sec,
+                        distance_m,
+                        rpe,
+                        notes
+                    FROM serie
+                    WHERE seance_exercice_id = ?
+                    ORDER BY numero_serie
+                """, (seance_exercice_id,))
+                
+                series = cursor.fetchall()
+                exercice_data["nombre_series"] = len(series)
+                
+                # Ajout des séries
+                for serie in series:
+                    serie_data = {
+                        "numero": serie[0],
+                        "poids_kg": serie[1],
+                        "repetitions": serie[2],
+                        "duree_sec": serie[3],
+                        "distance_m": serie[4],
+                        "rpe": serie[5],
+                        "notes": serie[6]
+                    }
+                    exercice_data["series"].append(serie_data)
+                
+                seance_data["exercices"].append(exercice_data)
+            
+            export_data["seances"].append(seance_data)
         
-        db.conn.commit()
-        stats['succes'] = True
+        # Sérialisation JSON
+        return json.dumps(export_data, indent=2, ensure_ascii=False)
     
     except Exception as e:
-        stats['erreurs'].append(f"Erreur générale: {str(e)}")
-        db.conn.rollback()
+        return json.dumps({
+            "erreur": str(e),
+            "type_erreur": type(e).__name__
+        }, indent=2, ensure_ascii=False)
     
-    return stats
+    finally:
+        if should_close:
+            conn.close()
+
+
+# ============================================================
+# FONCTIONS D'IMPORT EXISTANTES
+# ============================================================
+
+def importer_programme(db, fichier_json):
+    """
+    Importe un programme depuis un fichier JSON
+    
+    Args:
+        db: Connexion à la base de données
+        fichier_json: Contenu du fichier JSON
+    
+    Returns:
+        tuple: (succès: bool, message: str, prog_id: int ou None)
+    """
+    try:
+        # Parser le JSON
+        data = json.loads(fichier_json)
+        
+        # Validation de base
+        if "programme" not in data:
+            return False, "Structure JSON invalide: clé 'programme' manquante", None
+        
+        prog = data["programme"]
+        
+        # Gestion de la connexion
+        if isinstance(db, str):
+            conn = sqlite3.connect(db)
+            should_close = True
+        else:
+            conn = db
+            should_close = False
+        
+        try:
+            cursor = conn.cursor()
+            
+            # Insertion du programme
+            cursor.execute("""
+                INSERT INTO programme (nom, description, date_debut, date_fin, statut)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                prog.get("nom", "Programme importé"),
+                prog.get("description", ""),
+                prog.get("date_debut", datetime.now().strftime("%Y-%m-%d")),
+                prog.get("date_fin"),
+                prog.get("statut", "actif")
+            ))
+            
+            prog_id = cursor.lastrowid
+            
+            # Import des séances si présentes
+            if "seances" in data:
+                for seance in data["seances"]:
+                    cursor.execute("""
+                        INSERT INTO seance (programme_id, nom, date, commentaire, duree_min, statut)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        prog_id,
+                        seance.get("nom", "Séance"),
+                        seance.get("date", datetime.now().strftime("%Y-%m-%d")),
+                        seance.get("commentaire"),
+                        seance.get("duree_minutes"),
+                        seance.get("statut", "planifie")
+                    ))
+                    
+                    seance_id = cursor.lastrowid
+                    
+                    # Import des exercices
+                    if "exercices" in seance:
+                        for exercice in seance["exercices"]:
+                            # Vérifier si l'exercice existe
+                            cursor.execute("SELECT id FROM exercice WHERE nom = ?", (exercice.get("nom"),))
+                            ex_result = cursor.fetchone()
+                            
+                            if ex_result:
+                                exercice_id = ex_result[0]
+                            else:
+                                # Créer l'exercice s'il n'existe pas
+                                cursor.execute("""
+                                    INSERT INTO exercice (nom, description, categorie)
+                                    VALUES (?, ?, ?)
+                                """, (exercice.get("nom"), "", "autre"))
+                                exercice_id = cursor.lastrowid
+                            
+                            # Lier l'exercice à la séance
+                            cursor.execute("""
+                                INSERT INTO seance_exercice (seance_id, exercice_id, ordre, notes)
+                                VALUES (?, ?, ?, ?)
+                            """, (
+                                seance_id,
+                                exercice_id,
+                                exercice.get("ordre", 0),
+                                exercice.get("notes")
+                            ))
+                            
+                            seance_exercice_id = cursor.lastrowid
+                            
+                            # Import des séries
+                            if "series" in exercice:
+                                for serie in exercice["series"]:
+                                    cursor.execute("""
+                                        INSERT INTO serie (
+                                            seance_exercice_id, numero_serie, 
+                                            poids_kg, repetitions, duree_sec, 
+                                            distance_m, rpe, notes
+                                        )
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                    """, (
+                                        seance_exercice_id,
+                                        serie.get("numero", 1),
+                                        serie.get("poids_kg"),
+                                        serie.get("repetitions"),
+                                        serie.get("duree_sec"),
+                                        serie.get("distance_m"),
+                                        serie.get("rpe"),
+                                        serie.get("notes")
+                                    ))
+            
+            conn.commit()
+            return True, f"Programme importé avec succès (ID: {prog_id})", prog_id
+        
+        finally:
+            if should_close:
+                conn.close()
+    
+    except json.JSONDecodeError as e:
+        return False, f"Erreur de parsing JSON: {str(e)}", None
+    except Exception as e:
+        return False, f"Erreur lors de l'import: {str(e)}", None
+
+
+def valider_structure_json(data):
+    """
+    Valide la structure d'un JSON de programme
+    
+    Args:
+        data: Dictionnaire Python issu du JSON
+    
+    Returns:
+        tuple: (valide: bool, erreurs: list)
+    """
+    erreurs = []
+    
+    # Vérifications de base
+    if not isinstance(data, dict):
+        erreurs.append("Le JSON doit être un objet")
+        return False, erreurs
+    
+    if "programme" not in data:
+        erreurs.append("Clé 'programme' manquante")
+    else:
+        prog = data["programme"]
+        if "nom" not in prog:
+            erreurs.append("Le programme doit avoir un nom")
+    
+    # Vérifications des séances
+    if "seances" in data:
+        if not isinstance(data["seances"], list):
+            erreurs.append("'seances' doit être une liste")
+        else:
+            for i, seance in enumerate(data["seances"]):
+                if "exercices" in seance:
+                    if not isinstance(seance["exercices"], list):
+                        erreurs.append(f"Les exercices de la séance {i+1} doivent être une liste")
+    
+    return len(erreurs) == 0, erreurs
+
+
+# ============================================================
+# INTERFACE STREAMLIT POUR L'EXPORT
+# ============================================================
+
+def interface_export_streamlit(db, prog_id):
+    """
+    Interface Streamlit pour exporter la progression
+    
+    Args:
+        db: Connexion ou chemin vers la base de données
+        prog_id: ID du programme à exporter
+    """
+    st.subheader("📥 Exporter la progression")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.write("Exportez toutes les données de ce programme au format JSON.")
+    
+    with col2:
+        if st.button("📥 Exporter", use_container_width=True):
+            try:
+                # Génération du JSON
+                json_data = exporter_progression(db, prog_id)
+                
+                # Vérifier s'il y a une erreur
+                data = json.loads(json_data)
+                if "erreur" in data:
+                    st.error(f"❌ Erreur: {data['erreur']}")
+                    return
+                
+                # Nom du fichier
+                filename = f"progression_programme_{prog_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                
+                # Bouton de téléchargement
+                st.download_button(
+                    label="💾 Télécharger le fichier JSON",
+                    data=json_data,
+                    file_name=filename,
+                    mime="application/json",
+                    use_container_width=True
+                )
+                
+                # Statistiques
+                st.success(f"✅ Export réussi !")
+                st.info(f"📊 {data['nombre_seances']} séance(s) exportée(s)")
+                
+                # Aperçu optionnel
+                with st.expander("👁️ Aperçu des données"):
+                    st.json(data, expanded=False)
+                    
+            except Exception as e:
+                st.error(f"❌ Erreur lors de l'export: {str(e)}")
+
+
+# ============================================================
+# INTERFACE STREAMLIT POUR L'IMPORT
+# ============================================================
+
+def interface_import_streamlit(db):
+    """
+    Interface Streamlit pour importer un programme
+    
+    Args:
+        db: Connexion ou chemin vers la base de données
+    
+    Returns:
+        int ou None: ID du programme importé si succès
+    """
+    st.subheader("📤 Importer un programme")
+    
+    fichier = st.file_uploader(
+        "Choisissez un fichier JSON",
+        type=['json'],
+        help="Sélectionnez un fichier JSON de programme exporté précédemment"
+    )
+    
+    if fichier is not None:
+        try:
+            # Lecture du fichier
+            contenu = fichier.read().decode('utf-8')
+            
+            # Validation préalable
+            data = json.loads(contenu)
+            valide, erreurs = valider_structure_json(data)
+            
+            if not valide:
+                st.error("❌ Structure JSON invalide:")
+                for erreur in erreurs:
+                    st.write(f"  • {erreur}")
+                return None
+            
+            # Aperçu
+            with st.expander("👁️ Aperçu du programme"):
+                if "programme" in data:
+                    st.write(f"**Nom:** {data['programme'].get('nom', 'N/A')}")
+                    st.write(f"**Description:** {data['programme'].get('description', 'N/A')}")
+                    if "seances" in data:
+                        st.write(f"**Nombre de séances:** {len(data['seances'])}")
+            
+            # Bouton d'import
+            if st.button("✅ Importer le programme", type="primary"):
+                with st.spinner("Import en cours..."):
+                    succes, message, prog_id = importer_programme(db, contenu)
+                    
+                    if succes:
+                        st.success(message)
+                        st.balloons()
+                        return prog_id
+                    else:
+                        st.error(message)
+                        return None
+        
+        except json.JSONDecodeError:
+            st.error("❌ Le fichier n'est pas un JSON valide")
+        except Exception as e:
+            st.error(f"❌ Erreur: {str(e)}")
+    
+    return None
