@@ -6,6 +6,7 @@ Version améliorée avec thème sombre et nouvelles fonctionnalités
 import streamlit as st
 from database_schema import DatabaseSchema, format_duration
 from programme_learning_v2 import ProgrammeService, ProgressionService
+from import_programme import exporter_progression
 import os
 
 # ============================================================================
