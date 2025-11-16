@@ -586,8 +586,7 @@ elif page == "📊 Ma progression":
                     file_name=f"progression_{PROG_ID}_{datetime.now().strftime('%Y%m%d')}.json",
                     mime="application/json"
                 )
-        
-                 st.success(f"✅ Export réussi !")
+                st.success(f"✅ Export réussi !")
         
             except Exception as e:
                 st.error(f"❌ Erreur: {str(e)}")
