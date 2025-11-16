@@ -587,7 +587,7 @@ elif page == "📊 Ma progression":
                     mime="application/json"
                 )
         
-                 st.success("✅ Export réussi !")
+             st.success("✅ Export réussi !")
         
             except Exception as e:
                 st.error(f"❌ Erreur: {str(e)}")
